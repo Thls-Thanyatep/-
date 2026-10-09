@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>แยกเลข — เครื่องแตกเลขวางโพย</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Sarabun:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#12192b;
+    --ink-2:#1c2740;
+    --paper:#f6ecd8;
+    --paper-line:#e3d3ac;
+    --stamp:#b3372c;
+    --gold:#d7a13b;
+    --teal:#2f7a70;
+    --ink-text:#4a3f2f;
+    --muted:#9aa6c4;
+    --hairline:rgba(255,255,255,0.09);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #1e2a49 0%, var(--ink) 55%),
+      var(--ink);
+    background-attachment:fixed;
+    color:var(--paper);
+    font-family:'Sarabun',sans-serif;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    min-height:100%;
+  }
+  .wrap{
+    max-width:720px;
+    margin:0 auto;
+    padding:36px 20px 64px;
+  }
+  header{
+    text-align:center;
+    margin-bottom:28px;
+  }
+  .eyebrow{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+    letter-spacing:0.04em;
+    color:var(--gold);
+    background:rgba(215,161,59,0.1);
+    border:1px solid rgba(215,161,59,0.35);
+    padding:4px 12px;
+    border-radius:999px;
+    margin-bottom:14px;
+  }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--gold);}
+  h1{
+    font-family:'Chakra Petch',sans-serif;
+    font-weight:700;
+    font-size:clamp(26px,5vw,34px);
+    margin:0 0 8px;
+    letter-spacing:0.01em;
+  }
+  header p{
+    color:var(--muted);
+    font-size:15px;
+    max-width:480px;
+    margin:0 auto;
+    line-height:1.6;
+  }
+
+  .slip{
+    background:var(--paper);
+    color:var(--ink-text);
+    border-radius:14px;
+    padding:22px;
+    position:relative;
+    box-shadow:0 20px 45px -18px rgba(0,0,0,0.55);
+  }
+  .slip::before, .slip::after{
+    content:"";
+    position:absolute;
+    left:50%;
+    transform:translateX(-50%);
+    width:26px;height:26px;
+    background:var(--ink);
+    border-radius:50%;
+  }
+  .slip::before{top:-13px;}
+  .slip::after{bottom:-13px;}
+
+  .slip-title{
+    font-family:'Chakra Petch',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    letter-spacing:0.03em;
+    color:var(--stamp);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:12px;
+    padding-bottom:10px;
+    border-bottom:1.5px dashed var(--paper-line);
+  }
+  .slip-title span.tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--ink-text);
+    opacity:0.55;
+  }
+
+  textarea{
+    width:100%;
+    min-height:150px;
+    resize:vertical;
+    border:none;
+    background:transparent;
+    font-family:'JetBrains Mono',monospace;
+    font-size:15px;
+    line-height:1.9;
+    color:var(--ink-text);
+    outline:none;
+    background-image:repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(1.9em - 1px),
+      var(--paper-line) calc(1.9em - 1px),
+      var(--paper-line) calc(1.9em)
+    );
+  }
+  textarea::placeholder{color:#b5a487;}
+
+  .actions{
+    display:flex;
+    gap:10px;
+    margin-top:16px;
+    flex-wrap:wrap;
+  }
+  button{
+    font-family:'Chakra Petch',sans-serif;
+    font-weight:600;
+    font-size:14.5px;
+    border:none;
+    border-radius:9px;
+    padding:11px 18px;
+    cursor:pointer;
+    transition:transform .12s ease, filter .12s ease;
+  }
+  button:active{transform:scale(0.97);}
+  .btn-primary{
+    background:var(--teal);
+    color:#eafffb;
+  }
+  .btn-primary:hover{filter:brightness(1.08);}
+  .btn-ghost{
+    background:transparent;
+    color:var(--ink-text);
+    border:1.5px solid var(--paper-line);
+  }
+  .btn-ghost:hover{background:rgba(0,0,0,0.04);}
+
+  .results{
+    margin-top:28px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+
+  .stub{
+    background:var(--paper);
+    color:var(--ink-text);
+    border-radius:12px;
+    overflow:hidden;
+    box-shadow:0 14px 30px -16px rgba(0,0,0,0.5);
+  }
+  .stub-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:10px;
+    padding:14px 18px 10px;
+  }
+  .stub-head .src{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:15px;
+    letter-spacing:0.01em;
+  }
+  .stub-head .meta{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--stamp);
+    white-space:nowrap;
+  }
+  .stub-body{
+    padding:2px 18px 16px;
+  }
+  .chip-grid{
+    display:flex;
+    flex-wrap:wrap;
+    gap:7px;
+    margin-top:6px;
+  }
+  .chip{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:600;
+    font-size:14px;
+    background:#fff;
+    border:1px solid var(--paper-line);
+    color:var(--ink-text);
+    padding:5px 10px;
+    border-radius:7px;
+  }
+  .price-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin:10px 0 0;
+  }
+  .price-pill{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+    font-weight:600;
+    background:rgba(179,55,44,0.09);
+    border:1px solid rgba(179,55,44,0.3);
+    color:var(--stamp);
+    padding:5px 10px;
+    border-radius:7px;
+  }
+  .price-total{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+    color:var(--ink-text);
+    opacity:0.7;
+  }
+  .warn-row{
+    margin-top:8px;
+    font-size:12.5px;
+    color:var(--stamp);
+    background:rgba(179,55,44,0.08);
+    border:1px dashed rgba(179,55,44,0.35);
+    border-radius:8px;
+    padding:8px 10px;
+    line-height:1.6;
+  }
+  .unclear-row{
+    margin-top:8px;
+    font-size:12.5px;
+    color:var(--ink-text);
+    opacity:0.65;
+  }
+
+  .stub-foot{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 18px 14px;
+    border-top:1.5px dashed var(--paper-line);
+    margin-top:10px;
+  }
+  .count{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--ink-text);
+    opacity:0.6;
+  }
+  .copy-line{
+    font-family:'Sarabun',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    color:var(--teal);
+    background:rgba(47,122,112,0.1);
+    border:1px solid rgba(47,122,112,0.35);
+    border-radius:7px;
+    padding:6px 12px;
+    cursor:pointer;
+  }
+  .copy-line:hover{background:rgba(47,122,112,0.18);}
+  .copy-line.copied{background:var(--teal);color:#fff;border-color:var(--teal);}
+
+  .photo-status{
+    margin-top:12px;
+    font-size:13px;
+    color:var(--ink-text);
+    opacity:0.75;
+    line-height:1.6;
+  }
+  .photo-status.error{
+    color:var(--stamp);
+    opacity:1;
+  }
+
+  .empty-hint{
+    text-align:center;
+    color:var(--muted);
+    font-size:13.5px;
+    padding:20px 10px;
+  }
+
+  .note{
+    margin-top:22px;
+    font-size:13px;
+    color:var(--muted);
+    line-height:1.75;
+    border-left:2px solid rgba(215,161,59,0.5);
+    padding-left:12px;
+  }
+  .note b{color:var(--gold);font-weight:600;}
+
+  @media (prefers-color-scheme: light) {
+    :root{ }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow"><span class="dot"></span>เครื่องมือแยกเลข</div>
+    <h1>วางโพย → แตกเลข</h1>
+    <p>วางชุดเลขที่คัดลอกมาลงในช่องด้านล่าง แล้วกด "แยกเลข" โปรแกรมจะกระจายเลขกลับให้ทุกบรรทัดโดยอัตโนมัติ</p>
+  </header>
+
+  <div class="slip">
+    <div class="slip-title">วางโพยตรงนี้ <span class="tag">รองรับหลายบรรทัด</span></div>
+    <textarea id="input" placeholder="628-982-471-591=2×6
+101=2×3
+28-36-30-86-26-64=3 บลก
+0--7=3×3"></textarea>
+    <div class="actions">
+      <button class="btn-primary" id="runBtn">แยกเลข</button>
+      <button class="btn-ghost" id="copyAllBtn">คัดลอกทั้งหมด</button>
+      <button class="btn-ghost" id="clearBtn">ล้างข้อมูล</button>
+      <button class="btn-ghost" id="photoBtn" hidden>📷 อัปโหลดรูปบิล</button>
+      <input type="file" id="photoInput" accept="image/*" hidden>
+    </div>
+    <div class="photo-status" id="photoStatus" hidden></div>
+  </div>
+
+  <div class="results" id="results">
+    <div class="empty-hint">ผลลัพธ์จะแสดงตรงนี้หลังกดแยกเลข</div>
+  </div>
+
+  <div class="note">
+    <b>วิธีอ่านรูปแบบ</b> — เลข 3 หลัก (628-982) แตกเลขกลับตามจำนวนที่ไม่ซ้ำจริง · เลข 2 หลัก (28-36) แตกเป็นเลขเดิม+เลขกลับ ราคา "N บลก" ลงทั้งบนและล่าง · เลขเดี่ยว หรือ "0--7" หรือ "รูด 5" คือรูด ไล่ 0X, X0 ให้ครบ ราคาลงบนและล่างเท่ากัน · วางกลุ่มเลข (เช่น 12345) แล้วตามด้วยบรรทัด "=10×10" จะได้เลขจับคู่ 2 ตัวทั้งหมด, บรรทัด "3ตัว =3×6" จะได้เลข 3 ตัวจากชุดทั้งหมด, บรรทัด "รูด 1 =5บ." จะรูดเลข 1 ต่อท้ายบล็อกเดียวกันได้ · ช่อง "โต๊ด" ยังไม่มีตัวอย่างที่ใช้ ถ้ามีเคสไหนที่ต้องกรอกโต๊ด บอกเพิ่มได้เลยครับ
+  </div>
+</div>
+
+<script>
+/* ---------- number-generation helpers ---------- */
+
+function permute3Others(token){
+  const [a,b,c] = token.split('');
+  const order = [[a,c,b],[b,a,c],[b,c,a],[c,a,b],[c,b,a]];
+  const seen = new Set([token]);
+  const res = [];
+  order.forEach(arr=>{
+    const s = arr.join('');
+    if(!seen.has(s)){ seen.add(s); res.push(s); }
+  });
+  return res;
+}
+
+function reverseToken(t){ return t.split('').reverse().join(''); }
+
+function runAnchor(d){
+  const arr = [];
+  for(let x=0;x<10;x++) arr.push(d + String(x));
+  for(let x=0;x<10;x++){
+    if(String(x) === d) continue;
+    arr.push(String(x) + d);
+  }
+  return arr;
+}
+
+function allPerms3(a,b,c){
+  return [a+b+c, a+c+b, b+a+c, b+c+a, c+a+b, c+b+a];
+}
+
+// เลขจับคู่: every ordered pair of two distinct pool digits, forward combos first, then their reverses
+function pairCombos(pool){
+  const forward = [];
+  for(let i=0;i<pool.length;i++){
+    for(let j=i+1;j<pool.length;j++){
+      forward.push(pool[i] + pool[j]);
+    }
+  }
+  const backward = forward.map(s => s.split('').reverse().join(''));
+  return [...forward, ...backward];
+}
+
+// 3 ตัวจากชุดเลข: every combination of 3 distinct pool digits, each fully permuted (6 ways)
+function tripleCombos(pool){
+  const result = [];
+  for(let x=0;x<pool.length;x++){
+    for(let y=x+1;y<pool.length;y++){
+      for(let z=y+1;z<pool.length;z++){
+        result.push(...allPerms3(pool[x], pool[y], pool[z]));
+      }
+    }
+  }
+  return result;
+}
+
+/* ---------- price-suffix parsing ---------- */
+
+function parseSuffix(rawSuffix){
+  if(!rawSuffix) return null;
+  const norm = rawSuffix.replace(/[×xX\/]/g, '*').trim();
+
+  // "3 บลก" / "3บนล่าง" / "3บล": one amount, applied to both บน and ล่าง
+  if(norm.includes('บลก') || norm.includes('บนล่าง') || norm.includes('บล')){
+    const m = norm.match(/(\d+)/);
+    if(m) return { raw: rawSuffix, mode: 'topbottom', amount: parseInt(m[1], 10) };
+  }
+
+  // "2*6" (extra trailing text tolerated, e.g. "3/6กับ" normalizes to "3*6กับ"):
+  // amount * a reference count, used to sanity-check permutation totals
+  let m = norm.match(/^(\d+)\s*\*\s*(\d+)/);
+  if(m){
+    return { raw: rawSuffix, mode: 'amount-count', amount: parseInt(m[1], 10), count: parseInt(m[2], 10) };
+  }
+
+  // bare amount, optionally followed by บ. / บาท / ฿
+  m = norm.match(/^(\d+)\s*(บาท|บ\.?|฿)?\.?/);
+  if(m){
+    return { raw: rawSuffix, mode: 'amount-only', amount: parseInt(m[1], 10) };
+  }
+
+  // fallback: grab a leading number if there is one, otherwise give up
+  m = norm.match(/^(\d+)/);
+  if(m){
+    return { raw: rawSuffix, mode: 'amount-only', amount: parseInt(m[1], 10) };
+  }
+
+  return { raw: rawSuffix, mode: 'unknown' };
+}
+
+// Finds a price marker (บลก / บนล่าง / บล / ตรง / บนตรง) embedded anywhere in a line —
+// even glued directly onto a number with no separator, e.g. "11บล10" or "958บนตรง10".
+// Digits right after the marker are preferred as the amount; otherwise digits right
+// before it are used (e.g. "3 บลก").
+function extractLabeledPrice(line){
+  const markerRe = /บนล่าง|บนตรง|บลก|บล|ตรง/;
+  const m = markerRe.exec(line);
+  if(!m) return null;
+  const idx = m.index;
+  const markerText = m[0];
+  const kind = (markerText === 'บนตรง' || markerText === 'ตรง') ? 'straight' : 'topbottom';
+  const afterIdx = idx + markerText.length;
+  const after = line.slice(afterIdx);
+
+  const postMatch = after.match(/^\s*(\d+)(?:\s*[×xX*]\s*\d+)?/);
+  if(postMatch){
+    const amount = parseInt(postMatch[1], 10);
+    const removeEnd = afterIdx + postMatch[0].length;
+    const mainPart = (line.slice(0, idx) + line.slice(removeEnd)).trim();
+    return { mainPart, amount, kind };
+  }
+
+  const before = line.slice(0, idx);
+  const preMatch = before.match(/(\d+)(?:\s*[×xX*]\s*\d+)?\s*$/);
+  if(preMatch){
+    const amount = parseInt(preMatch[1], 10);
+    const removeStart = before.length - preMatch[0].length;
+    const mainPart = (line.slice(0, removeStart) + line.slice(afterIdx)).trim();
+    return { mainPart, amount, kind };
+  }
+
+  return null;
+}
+
+/* ---------- single-line bet parsing ---------- */
+
+function parseLine(rawLine){
+  const line = rawLine.trim();
+  if(!line) return null;
+
+  // เบิ้ล / ตอง keyword bills: fixed number sets, price is whatever text follows the keyword
+  let km;
+  if((km = line.match(/^เบิ้ล\s*(.*)$/i))){
+    const suffixRaw = km[1].trim();
+    const priceInfo = parseSuffix(suffixRaw);
+    const result = ['00','11','22','33','44','55','66','77','88','99'];
+    return { source:'เบิ้ล', suffix: suffixRaw, type:'เบิ้ล (00-99)', result, groupType:'double', priceInfo };
+  }
+  if((km = line.match(/^ตอง\s*(.*)$/i))){
+    const suffixRaw = km[1].trim();
+    const priceInfo = parseSuffix(suffixRaw);
+    const result = ['000','111','222','333','444','555','666','777','888','999'];
+    return { source:'ตอง', suffix: suffixRaw, type:'ตอง (000-999)', result, groupType:'triple-tong', priceInfo };
+  }
+
+  const eqIdx = line.indexOf('=');
+  let mainPart, suffixRaw, forcedKind = null;
+  if(eqIdx !== -1){
+    mainPart = line.slice(0, eqIdx).trim();
+    suffixRaw = line.slice(eqIdx + 1).trim();
+  } else {
+    // no "=" at all: first look for a บลก/บล/บนล่าง/ตรง/บนตรง marker anywhere,
+    // even glued directly onto a number (e.g. "11บล10", "958บนตรง10")
+    const labeled = extractLabeledPrice(line);
+    if(labeled){
+      mainPart = labeled.mainPart;
+      suffixRaw = String(labeled.amount);
+      forcedKind = labeled.kind;
+    } else {
+      // otherwise check whether the line ends in a "price×count" style token
+      // (e.g. "500-10*3", "425 157 259 10×6", "68 5/5"), whatever separates it
+      // from the numbers before it — "×", "x", "*" or "/" all count
+      const segments = line.split(/[\s,\-]+/).map(s=>s.trim()).filter(Boolean);
+      const last = segments[segments.length - 1] || '';
+      if(segments.length >= 2 && /^\d+\s*[×xX*\/]\s*\d+/.test(last)){
+        mainPart = segments.slice(0, -1).join(' ');
+        suffixRaw = last;
+      } else {
+        mainPart = line;
+        suffixRaw = '';
+      }
+    }
+  }
+  const priceInfo = parseSuffix(suffixRaw);
+  if(priceInfo && forcedKind === 'topbottom'){ priceInfo.mode = 'topbottom'; }
+
+  if(!mainPart) return null;
+
+  // "ตรง" / "บนตรง": bet the numbers exactly as written, no permutation expansion
+  if(forcedKind === 'straight'){
+    const tokens = mainPart.split(/\D+/).map(s=>s.trim()).filter(Boolean);
+    if(tokens.length === 0) return null;
+    return { source: mainPart, suffix: suffixRaw, type:'ตรง (ไม่กลับ)', result: tokens, groupType:'straight', priceInfo };
+  }
+
+  // "รูด 5", "ร 8", or "รูด 0-7" style written on one line
+  let rm = mainPart.match(/^ร(?:[ูุ]ด)?\s+(.+)$/i);
+  if(rm){
+    const spec = rm[1].trim();
+    const anchors = spec.split(/\D+/).map(s=>s.trim()).filter(Boolean);
+    let result = [];
+    anchors.forEach(a => result.push(...runAnchor(a)));
+    return { source: mainPart, suffix: suffixRaw, type:'รูด', result, groupType:'run', priceInfo };
+  }
+
+  if(mainPart.includes('--')){
+    const anchors = mainPart.split('--').map(s=>s.trim()).filter(Boolean);
+    if(anchors.length === 0) return null;
+    let result = [];
+    anchors.forEach(a => result.push(...runAnchor(a)));
+    return { source: mainPart, suffix: suffixRaw, type:'รูด', result, groupType:'run', priceInfo };
+  }
+
+  const tokens = mainPart.split(/\D+/).map(s=>s.trim()).filter(Boolean);
+  if(tokens.length === 0) return null;
+
+  // exactly one or two single-digit tokens (any separator, or none) is รูด
+  if(tokens.every(t => t.length === 1) && tokens.length <= 2){
+    let result = [];
+    tokens.forEach(t => result.push(...runAnchor(t)));
+    return { source: mainPart, suffix: suffixRaw, type:'รูด', result, groupType:'run', priceInfo };
+  }
+
+  // 3+ single-digit tokens (any separator), or one run of 4+ digits with no separator at all,
+  // is a เลขจับวิน digit pool. The "M" in "N×M" tells us the unit: ×6 means each 3-digit
+  // combo unfolds into 6 permutations (วิน 3 ตัว), anything else defaults to the 2-digit pairing.
+  if((tokens.every(t => t.length === 1) && tokens.length >= 3) || (tokens.length === 1 && tokens[0].length >= 4)){
+    const pool = tokens.length === 1 ? tokens[0].split('') : tokens;
+    if(priceInfo && priceInfo.mode === 'amount-count' && priceInfo.count === 6){
+      const result = tripleCombos(pool);
+      return { source: mainPart, suffix: suffixRaw, type:'3 ตัวจากชุดเลข (จับวิน)', result, groupType:'wheel-triple', priceInfo };
+    }
+    const result = pairCombos(pool);
+    return { source: mainPart, suffix: suffixRaw, type:'จับคู่ 2 ตัว (จับวิน)', result, groupType:'wheel-pair', priceInfo };
+  }
+
+  const len = tokens[0].length;
+  const mixedLengths = tokens.some(t => t.length !== len);
+
+  if(len === 3){
+    let result = [...tokens];
+    const perTokenCounts = {};
+    const mismatches = [];
+    tokens.forEach(t => {
+      const others = permute3Others(t);
+      perTokenCounts[t] = others.length + 1;
+      result.push(...others);
+    });
+    // M is only ever a real permutation count when it's 3 or 6 (the only possible
+    // totals for a 3-digit number); any other M means "ตรง N โต๊ด M" instead.
+    if(priceInfo && priceInfo.mode === 'amount-count' && (priceInfo.count === 3 || priceInfo.count === 6)){
+      tokens.forEach(t => {
+        if(perTokenCounts[t] !== priceInfo.count){
+          mismatches.push({ token: t, actual: perTokenCounts[t], expected: priceInfo.count });
+        }
+      });
+    }
+    return { source: mainPart, suffix: suffixRaw, type:'3 ตัวกลับ', result, groupType:'perm3', priceInfo, mismatches, mixedLengths, tokenCount: tokens.length };
+  }
+
+  if(len === 2){
+    // an explicit บลก / บนล่าง / บล marker means "reverse everything, no exceptions" —
+    // every token gets its own reverse even if it duplicates another token's reverse.
+    const alwaysReverse = !!(priceInfo && priceInfo.mode === 'topbottom');
+    let result = [...tokens];
+    let shouldReverse = alwaysReverse;
+    if(!alwaysReverse){
+      // without that marker, only skip reversal when EVERY distinct number on the
+      // line already has its mirror present too — i.e. the whole line is already
+      // written as complete pairs. If even one number lacks its mirror, reverse all.
+      const uniqueVals = new Set(tokens);
+      const fullyMirrored = [...uniqueVals].every(t => {
+        const r = reverseToken(t);
+        return r === t || uniqueVals.has(r);
+      });
+      shouldReverse = !fullyMirrored;
+    }
+    if(shouldReverse){
+      tokens.forEach(t => {
+        const r = reverseToken(t);
+        if(r !== t) result.push(r);
+      });
+    }
+    return { source: mainPart, suffix: suffixRaw, type:'2 ตัวกลับ', result, groupType:'perm2', priceInfo, mixedLengths };
+  }
+
+  return { source: mainPart, suffix: suffixRaw, type:'ตามที่วาง', result: tokens, groupType:'raw', priceInfo };
+}
+
+/* ---------- multi-line "เลขจับวิน" wheel-block parsing ---------- */
+
+function isHeaderLabel(line){
+  const compact = line.replace(/[.\s]/g, '');
+  return compact.length > 0 && compact.length <= 6 && /^[บลก]+$/.test(compact);
+}
+
+function looksLikeWheelBlockStart(lines, idx){
+  if(idx < 0 || idx >= lines.length) return false;
+  if(!/^\d{3,}$/.test(lines[idx].trim())) return false;
+  let next = (lines[idx+1] || '').trim();
+  if(isHeaderLabel(next)){ next = (lines[idx+2] || '').trim(); } // "บ.ล.ก" can sit right after the pool too
+  return next.startsWith('=') || /^3\s*ตัว/i.test(next) || /^ร[ูุ]ด/i.test(next);
+}
+
+function stripLeadingEquals(s){
+  s = s.trim();
+  return s.startsWith('=') ? s.slice(1).trim() : s;
+}
+
+function buildWheelCard(source, type, groupType, result, priceInfo, suffixRaw, mismatches){
+  return { source, suffix: suffixRaw || '', type, result, groupType, priceInfo, mismatches };
+}
+
+function lineHasSuffix(line){
+  const trimmed = line.trim();
+  if(/^(เบิ้ล|ตอง)\b/i.test(trimmed)) return true; // self-contained keyword bills
+  if(line.includes('=')) return true;
+  if(/บนล่าง|บนตรง|บลก|บล|ตรง/.test(line)) return true;
+  const segments = line.split(/[\s,\-]+/).map(s=>s.trim()).filter(Boolean);
+  const last = segments[segments.length - 1] || '';
+  return /^\d+\s*[×xX*\/]\s*\d+/.test(last);
+}
+
+// paper-bill style: one plain "number = price" per line (no × or * or บลก at all).
+// Several of these in a row get grouped by matching price into one card each,
+// since a handwritten bill often lists every number's price on its own line.
+function isPlainPriceLine(line){
+  const m = line.trim().match(/^(\d{2,3})\s*=\s*(\d+)$/);
+  return m ? { number: m[1], price: parseInt(m[2], 10) } : null;
+}
+
+// one 2-digit number with an "N×M" price, e.g. "09 = 100 x 100"
+function isPairPriceLine(line){
+  const m = line.trim().match(/^(\d{2})\s*=\s*(\d+\s*[×xX*\/]\s*\d+)\s*$/);
+  return m ? { number: m[1], suffix: m[2].replace(/\s+/g, '') } : null;
+}
+
+function parseInput(rawText){
+  const lines = rawText.split('\n');
+  const cards = [];
+  let i = 0;
+
+  while(i < lines.length){
+    const line = lines[i].trim();
+    if(!line){ i++; continue; }
+
+    if(isHeaderLabel(line) && looksLikeWheelBlockStart(lines, i+1)){
+      i++; // absorb the "บ.ล.ก" style header, continue to the pool line
+      continue;
+    }
+
+    // a line with no digits at all (e.g. a customer's name) is just a label — skip it
+    if(!/\d/.test(line) && !/^(เบิ้ล|ตอง)/.test(line)){ i++; continue; }
+
+    // paper-bill style: 2+ lines in a row like "46=50" / "49=100" — group by matching price.
+    // A "ตรง+โต๊ด" line (e.g. "785=25*25") can interrupt the run without breaking it.
+    if(isPlainPriceLine(line)){
+      const groups = new Map();
+      const order = [];
+      const inlineCards = [];
+      let plainCount = 0;
+      let j = i;
+      while(j < lines.length){
+        const raw = (lines[j] || '').trim();
+        const info = isPlainPriceLine(raw);
+        if(info){
+          if(!groups.has(info.price)){ groups.set(info.price, []); order.push(info.price); }
+          groups.get(info.price).push(info.number);
+          plainCount++;
+          j++;
+          continue;
+        }
+        if(/^\d+\s*=\s*\d+\s*[×xX*\/]\s*\d+/.test(raw)){
+          const parsed = parseLine(raw);
+          if(parsed) inlineCards.push(parsed);
+          j++;
+          continue;
+        }
+        break;
+      }
+      if(plainCount >= 2){
+        order.forEach(price => {
+          const nums = groups.get(price);
+          cards.push({
+            source: nums.join(' '),
+            suffix: String(price),
+            type: 'บิลกระดาษ (ราคาเดียวกัน)',
+            result: nums,
+            groupType: 'straight',
+            priceInfo: { raw: String(price), mode: 'amount-only', amount: price }
+          });
+        });
+        inlineCards.forEach(c => cards.push(c));
+        i = j;
+        continue;
+      }
+      // not enough plain-price lines here to justify grouping — fall through as normal
+    }
+
+    // several 2-digit lines sharing an "N×M" price (often repeated again under a ล่าง label):
+    // group them by price, reverse each number implicitly, and drop duplicates
+    if(isPairPriceLine(line)){
+      const groups = new Map();
+      const order = [];
+      let hits = 0, lastHit = i, j = i;
+      while(j < lines.length){
+        const raw = (lines[j] || '').trim();
+        const info = isPairPriceLine(raw);
+        if(info){
+          if(!groups.has(info.suffix)){ groups.set(info.suffix, []); order.push(info.suffix); }
+          const list = groups.get(info.suffix);
+          if(!list.includes(info.number)) list.push(info.number);
+          hits++; lastHit = j; j++;
+          continue;
+        }
+        if(!raw || !/\d/.test(raw)){ j++; continue; } // blank or บน/ล่าง label between lines
+        break;
+      }
+      if(hits >= 2){
+        order.forEach(suffix => {
+          const result = [];
+          groups.get(suffix).forEach(n => {
+            if(!result.includes(n)) result.push(n);
+            const r = reverseToken(n);
+            if(r !== n && !result.includes(r)) result.push(r);
+          });
+          cards.push({
+            source: groups.get(suffix).join(' '),
+            suffix,
+            type: '2 ตัวกลับ (รวมบน/ล่าง)',
+            result,
+            groupType: 'perm2',
+            priceInfo: parseSuffix(suffix)
+          });
+        });
+        i = lastHit + 1;
+        continue;
+      }
+    }
+
+    if(looksLikeWheelBlockStart(lines, i)){
+      const pool = line.split('');
+      i++;
+      if(isHeaderLabel((lines[i] || '').trim())){ i++; } // "บ.ล.ก" can sit right after the pool too
+      while(i < lines.length){
+        const sub = lines[i].trim();
+        if(!sub){ i++; break; }
+
+        if(sub.startsWith('=')){
+          const suffix = stripLeadingEquals(sub);
+          const priceInfo = parseSuffix(suffix);
+          const result = pairCombos(pool);
+          cards.push(buildWheelCard(pool.join(''), 'จับคู่ 2 ตัว (บน-ล่าง-กลับ)', 'wheel-pair', result, priceInfo, suffix));
+          i++;
+          continue;
+        }
+
+        const m3 = sub.match(/^3\s*ตัว\s*(.*)$/i);
+        if(m3){
+          const suffix = stripLeadingEquals(m3[1]);
+          const priceInfo = parseSuffix(suffix);
+          const result = tripleCombos(pool);
+          cards.push(buildWheelCard(pool.join(''), '3 ตัวจากชุดเลข', 'wheel-triple', result, priceInfo, suffix));
+          i++;
+          continue;
+        }
+
+        const mr = sub.match(/^ร[ูุ]ด\s+(\S+)\s*(.*)$/i);
+        if(mr){
+          const anchorSpec = mr[1];
+          const anchors = anchorSpec.split(/\D+/).map(s=>s.trim()).filter(Boolean);
+          const suffix = stripLeadingEquals(mr[2]);
+          const priceInfo = parseSuffix(suffix);
+          let result = [];
+          anchors.forEach(a => result.push(...runAnchor(a)));
+          cards.push(buildWheelCard(anchorSpec, 'รูด', 'wheel-run', result, priceInfo, suffix));
+          i++;
+          continue;
+        }
+
+        break; // unrecognised line: end the block, don't consume it
+      }
+      continue;
+    }
+
+    // A bill can spread its numbers across several lines and only give the price
+    // on the last one. Merge lines lacking a price of their own into the next
+    // line that has one, so "=10×10" (or a trailing "N×M") closes the whole group.
+    if(lineHasSuffix(line)){
+      const parsed = parseLine(line);
+      if(parsed) cards.push(parsed);
+      i++;
+      continue;
+    }
+
+    const buffer = [line];
+    let j = i + 1;
+    while(j < lines.length){
+      const nextRaw = lines[j];
+      const next = nextRaw.trim();
+      if(!next || (!/\d/.test(next) && !/^(เบิ้ล|ตอง)/.test(next))) break; // blank/label line ends the group
+      if((isHeaderLabel(next) && looksLikeWheelBlockStart(lines, j+1)) || looksLikeWheelBlockStart(lines, j) || /^ร[ูุ]ด\s+/i.test(next)) break;
+      buffer.push(next);
+      j++;
+      if(lineHasSuffix(next)) break; // group complete, price found
+    }
+    const combined = buffer.join(' ');
+    const parsed = parseLine(combined);
+    if(parsed) cards.push(parsed);
+    i = j;
+    continue;
+  }
+
+  return cards;
+}
+
+/* ---------- pricing summary for display ---------- */
+
+function priceSection(item){
+  const pi = item.priceInfo;
+  if(!pi || pi.mode === 'unknown' || pi.amount === undefined){
+    return item.suffix ? { kind: 'unclear', suffix: item.suffix } : null;
+  }
+  if(item.groupType === 'perm3'){
+    if(pi.mode === 'amount-count' && pi.count !== 3 && pi.count !== 6){
+      // "N*M" where M isn't a real permutation count (3 or 6) means "ตรง N โต๊ด M":
+      // a straight bet on the number itself, plus a separate โต๊ด (any-order) bet.
+      const tokenCount = item.tokenCount || 1;
+      return {
+        kind: 'tote',
+        straight: pi.amount,
+        tote: pi.count,
+        tokenCount,
+        total: (pi.amount + pi.count) * tokenCount
+      };
+    }
+    return {
+      kind: 'top-only',
+      amount: pi.amount,
+      total: pi.amount * item.result.length,
+      count: item.result.length,
+      mismatches: item.mismatches || []
+    };
+  }
+  if(item.groupType === 'wheel-triple' || item.groupType === 'triple-tong' || item.groupType === 'straight'){
+    return {
+      kind: 'top-only',
+      amount: pi.amount,
+      total: pi.amount * item.result.length,
+      count: item.result.length,
+      mismatches: item.mismatches || []
+    };
+  }
+  // perm2, run, wheel-pair, wheel-run, double: price applies to both บน and ล่าง
+  return {
+    kind: 'topbottom',
+    amount: pi.amount,
+    total: pi.amount * item.result.length * 2,
+    count: item.result.length
+  };
+}
+
+/* ---------- rendering ---------- */
+
+function render(rawText){
+  const container = document.getElementById('results');
+  container.innerHTML = '';
+
+  const parsed = parseInput(rawText);
+
+  if(parsed.length === 0){
+    container.innerHTML = '<div class="empty-hint">ไม่พบชุดเลขที่อ่านได้ ลองตรวจรูปแบบอีกครั้ง</div>';
+    window.__lastParsed = null;
+    return;
+  }
+
+  parsed.forEach(item => {
+    const stub = document.createElement('div');
+    stub.className = 'stub';
+
+    const head = document.createElement('div');
+    head.className = 'stub-head';
+    head.innerHTML = `<span class="src">${item.source}</span><span class="meta">${item.type}${item.suffix ? ' · =' + item.suffix : ''}</span>`;
+    stub.appendChild(head);
+
+    const body = document.createElement('div');
+    body.className = 'stub-body';
+    const grid = document.createElement('div');
+    grid.className = 'chip-grid';
+    item.result.forEach(n => {
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.textContent = n;
+      grid.appendChild(chip);
+    });
+    body.appendChild(grid);
+
+    if(item.mixedLengths){
+      const mixWarn = document.createElement('div');
+      mixWarn.className = 'warn-row';
+      mixWarn.textContent = '⚠ พบเลขในบรรทัดนี้ความยาวไม่เท่ากัน ระบบตีความตามความยาวของตัวแรก อาจไม่ครบทุกตัว';
+      body.appendChild(mixWarn);
+    }
+
+    const price = priceSection(item);
+    if(price){
+      if(price.kind === 'top-only'){
+        const row = document.createElement('div');
+        row.className = 'price-row';
+        const pill = document.createElement('span');
+        pill.className = 'price-pill';
+        pill.textContent = `บน ${price.amount} ฿ / ตัว`;
+        const total = document.createElement('span');
+        total.className = 'price-total';
+        total.textContent = `รวม ${price.total} ฿ (${price.count} ตัว)`;
+        row.appendChild(pill);
+        row.appendChild(total);
+        body.appendChild(row);
+
+        if(price.mismatches && price.mismatches.length > 0){
+          const warn = document.createElement('div');
+          warn.className = 'warn-row';
+          warn.textContent = '⚠ ' + price.mismatches.map(m => `${m.token} มีเลขซ้ำ ได้ ${m.actual} ตัวแทนที่จะเป็น ${m.expected} ตัวตามที่ระบุ`).join(' · ');
+          body.appendChild(warn);
+        }
+      } else if(price.kind === 'tote'){
+        const row = document.createElement('div');
+        row.className = 'price-row';
+        const pill1 = document.createElement('span');
+        pill1.className = 'price-pill';
+        pill1.textContent = `ตรง ${price.straight} ฿`;
+        const pill2 = document.createElement('span');
+        pill2.className = 'price-pill';
+        pill2.textContent = `โต๊ด ${price.tote} ฿`;
+        const total = document.createElement('span');
+        total.className = 'price-total';
+        total.textContent = price.tokenCount > 1
+          ? `รวม ${price.total} ฿ (${price.tokenCount} เลข × ตรง+โต๊ด)`
+          : `รวม ${price.total} ฿ (ตรง+โต๊ด)`;
+        row.appendChild(pill1);
+        row.appendChild(pill2);
+        row.appendChild(total);
+        body.appendChild(row);
+      } else if(price.kind === 'topbottom'){
+        const row = document.createElement('div');
+        row.className = 'price-row';
+        const pill1 = document.createElement('span');
+        pill1.className = 'price-pill';
+        pill1.textContent = `บน ${price.amount} ฿ / ตัว`;
+        const pill2 = document.createElement('span');
+        pill2.className = 'price-pill';
+        pill2.textContent = `ล่าง ${price.amount} ฿ / ตัว`;
+        const total = document.createElement('span');
+        total.className = 'price-total';
+        total.textContent = `รวม ${price.total} ฿ (${price.count} ตัว × 2 ช่อง)`;
+        row.appendChild(pill1);
+        row.appendChild(pill2);
+        row.appendChild(total);
+        body.appendChild(row);
+      } else if(price.kind === 'unclear'){
+        const note = document.createElement('div');
+        note.className = 'unclear-row';
+        note.textContent = `พบป้าย "=${price.suffix}" แต่ยังไม่ยืนยันความหมายราคาสำหรับรูปแบบนี้`;
+        body.appendChild(note);
+      }
+    }
+
+    stub.appendChild(body);
+
+    const foot = document.createElement('div');
+    foot.className = 'stub-foot';
+    const count = document.createElement('span');
+    count.className = 'count';
+    count.textContent = `${item.result.length} เลข`;
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'copy-line';
+    copyBtn.textContent = 'คัดลอกชุดนี้';
+    copyBtn.addEventListener('click', () => copyText(item.result.join(' '), copyBtn));
+    foot.appendChild(count);
+    foot.appendChild(copyBtn);
+    stub.appendChild(foot);
+
+    container.appendChild(stub);
+  });
+
+  window.__lastParsed = parsed;
+}
+
+async function copyText(text, btnEl){
+  try{
+    await navigator.clipboard.writeText(text);
+  }catch(e){
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }catch(e2){
+      console.error('Copy failed', e2);
+      return;
+    }
+  }
+  if(btnEl){
+    const original = btnEl.textContent;
+    btnEl.textContent = 'คัดลอกแล้ว ✓';
+    btnEl.classList.add('copied');
+    setTimeout(() => {
+      btnEl.textContent = original;
+      btnEl.classList.remove('copied');
+    }, 1200);
+  }
+}
+
+document.getElementById('runBtn').addEventListener('click', () => {
+  render(document.getElementById('input').value);
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  document.getElementById('input').value = '';
+  document.getElementById('results').innerHTML = '<div class="empty-hint">ผลลัพธ์จะแสดงตรงนี้หลังกดแยกเลข</div>';
+  window.__lastParsed = null;
+});
+
+document.getElementById('copyAllBtn').addEventListener('click', (e) => {
+  if(!window.__lastParsed || window.__lastParsed.length === 0){
+    render(document.getElementById('input').value);
+  }
+  if(window.__lastParsed && window.__lastParsed.length > 0){
+    const text = window.__lastParsed.map(p => p.result.join(' ')).join('\n');
+    copyText(text, e.currentTarget);
+  }
+});
+
+/* ---------- photo upload: ask Claude to transcribe a photographed bill ---------- */
+
+const OCR_PROMPT = `ภาพนี้คือบิลแทงหวย (อาจเป็นลายมือเขียนบนกระดาษ หรือภาพหน้าจอ) อ่านตัวเลขและราคาทั้งหมดในภาพ แล้วแปลงเป็นข้อความ "บิล" ตามกติกานี้ ห้ามใส่คำอธิบายใดๆ ตอบเฉพาะบรรทัดบิลเท่านั้น:
+
+- แต่ละชุดตัวเลขให้ขึ้นบรรทัดใหม่ รูปแบบพื้นฐาน: เลข=ราคา เช่น 46=50
+- ถ้าหลายเลขในบรรทัดเดียวกันมีราคาเท่ากัน ให้คั่นเลขด้วยช่องว่างแล้วตามด้วย =ราคา เช่น 46 54=50
+- ถ้าเขียนกำกับว่า "ตรง", "บนตรง", "บลก", "บนล่าง", "รูด", "เบิ้ล", "ตอง" ให้คงคำเหล่านั้นไว้ในบรรทัดด้วย เช่น 985 958=10บนตรง หรือ ร 8=100บลก
+- ถ้ามีรูปแบบราคา เช่น 25*25 หรือ 3*6 ให้คงไว้ตามเดิม เช่น 785=25*25
+- ถ้าภาพแบ่งเป็นสองคอลัมน์ (เช่น ซ้าย/ขวา หรือ บน/ล่าง) ให้อ่านคอลัมน์ซ้ายหรือคอลัมน์แรกให้ครบทุกบรรทัดก่อน แล้วค่อยต่อด้วยคอลัมน์ที่สอง แต่ละเลขให้เขียนเป็น "เลข=ราคา" บรรทัดของตัวเอง อย่าใส่คำว่า "บน" หรือ "ล่าง" ต่อท้ายราคา
+- อ่านให้ครบทุกบรรทัดในภาพตามลำดับจากบนลงล่าง
+- ตอบกลับเป็นบรรทัดบิลล้วนๆ ไม่ต้องมีหัวข้อ คำนำ หรือสรุปท้าย`;
+
+(async () => {
+  let sample = null;
+  try {
+    sample = window.claude ? await window.claude.use('sample') : null;
+  } catch(e) {
+    sample = null;
+  }
+  if(!sample) return;
+
+  let limits = null;
+  try {
+    limits = await sample.limits();
+  } catch(e) {
+    return;
+  }
+  if(!limits || !limits.images) return;
+
+  const photoBtn = document.getElementById('photoBtn');
+  const photoInput = document.getElementById('photoInput');
+  const photoStatus = document.getElementById('photoStatus');
+
+  photoInput.accept = limits.images.mediaTypes.join(',');
+  photoBtn.hidden = false;
+
+  photoBtn.addEventListener('click', () => photoInput.click());
+
+  photoInput.addEventListener('change', async () => {
+    const file = photoInput.files && photoInput.files[0];
+    photoInput.value = '';
+    if(!file) return;
+
+    photoBtn.disabled = true;
+    photoStatus.hidden = false;
+    photoStatus.classList.remove('error');
+    photoStatus.textContent = 'กำลังอ่านภาพ...';
+
+    try {
+      const result = await sample(OCR_PROMPT, { images: file, modelTier: 'default', cache: false });
+      const text = result.text.trim();
+      if(text){
+        document.getElementById('input').value = text;
+        photoStatus.textContent = 'อ่านภาพเสร็จแล้ว — ตรวจทานความถูกต้องก่อนกด "แยกเลข"';
+      } else {
+        photoStatus.classList.add('error');
+        photoStatus.textContent = 'อ่านภาพไม่พบตัวเลข ลองถ่ายใหม่ให้ชัดขึ้น';
+      }
+    } catch(err){
+      photoStatus.classList.add('error');
+      if(err && err.code === 'not_granted'){
+        photoStatus.textContent = 'ต้องอนุญาตให้หน้านี้ใช้ Claude ก่อนถึงจะอ่านภาพได้';
+      } else if(err && err.code === 'image_rejected'){
+        photoStatus.textContent = 'ไฟล์ภาพนี้ใช้ไม่ได้ ลองไฟล์อื่น';
+      } else if(err && err.code === 'rate_limited'){
+        photoStatus.textContent = 'ใช้งานถี่เกินไป รอสักครู่แล้วลองใหม่';
+      } else {
+        photoStatus.textContent = 'อ่านภาพไม่สำเร็จ ลองใหม่อีกครั้ง';
+      }
+    } finally {
+      photoBtn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
