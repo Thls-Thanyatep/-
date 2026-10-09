@@ -474,6 +474,35 @@ function extractLabeledPrice(line){
 
 /* ---------- single-line bet parsing ---------- */
 
+// Splits a line (with no เบิ้ล/ตอง keyword) into {mainPart, suffixRaw, forcedKind}.
+// forcedKind is 'topbottom' (บลก/บนล่าง/บล) or 'straight' (ตรง/บนตรง) when a labeled
+// marker was found, otherwise null.
+function splitMainAndSuffix(line){
+  const eqIdx = line.indexOf('=');
+  if(eqIdx !== -1){
+    return {
+      mainPart: line.slice(0, eqIdx).trim(),
+      suffixRaw: line.slice(eqIdx + 1).trim(),
+      forcedKind: null
+    };
+  }
+  // no "=" at all: first look for a บลก/บล/บนล่าง/ตรง/บนตรง marker anywhere,
+  // even glued directly onto a number (e.g. "11บล10", "958บนตรง10")
+  const labeled = extractLabeledPrice(line);
+  if(labeled){
+    return { mainPart: labeled.mainPart, suffixRaw: String(labeled.amount), forcedKind: labeled.kind };
+  }
+  // otherwise check whether the line ends in a "price×count" style token
+  // (e.g. "500-10*3", "425 157 259 10×6", "68 5/5"), whatever separates it
+  // from the numbers before it — "×", "x", "*" or "/" all count
+  const segments = line.split(/[\s,\-]+/).map(s=>s.trim()).filter(Boolean);
+  const last = segments[segments.length - 1] || '';
+  if(segments.length >= 2 && /^\d+\s*[×xX*\/]\s*\d+/.test(last)){
+    return { mainPart: segments.slice(0, -1).join(' '), suffixRaw: last, forcedKind: null };
+  }
+  return { mainPart: line, suffixRaw: '', forcedKind: null };
+}
+
 function parseLine(rawLine){
   const line = rawLine.trim();
   if(!line) return null;
@@ -493,34 +522,7 @@ function parseLine(rawLine){
     return { source:'ตอง', suffix: suffixRaw, type:'ตอง (000-999)', result, groupType:'triple-tong', priceInfo };
   }
 
-  const eqIdx = line.indexOf('=');
-  let mainPart, suffixRaw, forcedKind = null;
-  if(eqIdx !== -1){
-    mainPart = line.slice(0, eqIdx).trim();
-    suffixRaw = line.slice(eqIdx + 1).trim();
-  } else {
-    // no "=" at all: first look for a บลก/บล/บนล่าง/ตรง/บนตรง marker anywhere,
-    // even glued directly onto a number (e.g. "11บล10", "958บนตรง10")
-    const labeled = extractLabeledPrice(line);
-    if(labeled){
-      mainPart = labeled.mainPart;
-      suffixRaw = String(labeled.amount);
-      forcedKind = labeled.kind;
-    } else {
-      // otherwise check whether the line ends in a "price×count" style token
-      // (e.g. "500-10*3", "425 157 259 10×6", "68 5/5"), whatever separates it
-      // from the numbers before it — "×", "x", "*" or "/" all count
-      const segments = line.split(/[\s,\-]+/).map(s=>s.trim()).filter(Boolean);
-      const last = segments[segments.length - 1] || '';
-      if(segments.length >= 2 && /^\d+\s*[×xX*\/]\s*\d+/.test(last)){
-        mainPart = segments.slice(0, -1).join(' ');
-        suffixRaw = last;
-      } else {
-        mainPart = line;
-        suffixRaw = '';
-      }
-    }
-  }
+  const { mainPart, suffixRaw, forcedKind } = splitMainAndSuffix(line);
   const priceInfo = parseSuffix(suffixRaw);
   if(priceInfo && forcedKind === 'topbottom'){ priceInfo.mode = 'topbottom'; }
 
@@ -578,6 +580,15 @@ function parseLine(rawLine){
   const mixedLengths = tokens.some(t => t.length !== len);
 
   if(len === 3){
+    // M is only ever a real permutation count when it's 3 or 6 (the only possible
+    // totals for a 3-digit number); any other M means "ตรง N โต๊ด M" instead —
+    // a tote bet, which is shown as the literal numbers with no expansion at all,
+    // so the list stays easy to copy.
+    const isTote = priceInfo && priceInfo.mode === 'amount-count' && priceInfo.count !== 3 && priceInfo.count !== 6;
+    if(isTote){
+      return { source: mainPart, suffix: suffixRaw, type:'ตรง+โต๊ด', result: [...tokens], groupType:'perm3', priceInfo, mismatches: [], mixedLengths, tokenCount: tokens.length };
+    }
+
     let result = [...tokens];
     const perTokenCounts = {};
     const mismatches = [];
@@ -586,8 +597,6 @@ function parseLine(rawLine){
       perTokenCounts[t] = others.length + 1;
       result.push(...others);
     });
-    // M is only ever a real permutation count when it's 3 or 6 (the only possible
-    // totals for a 3-digit number); any other M means "ตรง N โต๊ด M" instead.
     if(priceInfo && priceInfo.mode === 'amount-count' && (priceInfo.count === 3 || priceInfo.count === 6)){
       tokens.forEach(t => {
         if(perTokenCounts[t] !== priceInfo.count){
@@ -827,9 +836,26 @@ function parseInput(rawText){
     // on the last one. Merge lines lacking a price of their own into the next
     // line that has one, so "=10×10" (or a trailing "N×M") closes the whole group.
     if(lineHasSuffix(line)){
-      const parsed = parseLine(line);
+      // the price can also come FIRST, followed by plain bare numbers with no
+      // suffix of their own — absorb those into this same group too. Rebuild the
+      // line as "numbers=suffix" so the extra numbers land before the price,
+      // not appended after it.
+      const extras = [];
+      let j = i + 1;
+      while(j < lines.length){
+        const nextTrim = (lines[j] || '').trim();
+        if(!nextTrim || !/^\d+$/.test(nextTrim)) break;
+        extras.push(nextTrim);
+        j++;
+      }
+      let lineToParse = line;
+      if(extras.length > 0 && !/^(เบิ้ล|ตอง)/i.test(line)){
+        const { mainPart, suffixRaw } = splitMainAndSuffix(line);
+        lineToParse = `${mainPart} ${extras.join(' ')}=${suffixRaw}`;
+      }
+      const parsed = parseLine(lineToParse);
       if(parsed) cards.push(parsed);
-      i++;
+      i = j;
       continue;
     }
 
