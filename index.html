@@ -280,6 +280,8 @@
   }
   .copy-line:hover{background:rgba(47,122,112,0.18);}
   .copy-line.copied{background:var(--teal);color:#fff;border-color:var(--teal);}
+  .chip.chip-linestart{color:#d11a1a;border-color:#d11a1a;font-weight:700;}
+  .btn-ghost.copied{background:var(--teal);color:#fff;border-color:var(--teal);}
 
   .photo-status{
     margin-top:12px;
@@ -331,6 +333,7 @@
 0--7=3×3"></textarea>
     <div class="actions">
       <button class="btn-primary" id="runBtn">แยกเลข</button>
+      <button class="btn-ghost" id="appendBtn">➕ วางต่อท้าย</button>
       <button class="btn-ghost" id="copyAllBtn">คัดลอกทั้งหมด</button>
       <button class="btn-ghost" id="clearBtn">ล้างข้อมูล</button>
       <button class="btn-ghost" id="photoBtn" hidden>📷 อัปโหลดรูปบิล</button>
@@ -586,7 +589,7 @@ function parseLine(rawLine){
     // so the list stays easy to copy.
     const isTote = priceInfo && priceInfo.mode === 'amount-count' && priceInfo.count !== 3 && priceInfo.count !== 6;
     if(isTote){
-      return { source: mainPart, suffix: suffixRaw, type:'ตรง+โต๊ด', result: [...tokens], groupType:'perm3', priceInfo, mismatches: [], mixedLengths, tokenCount: tokens.length };
+      return { source: mainPart, suffix: suffixRaw, type:'ตรง+โต๊ด', result: [...tokens], groupType:'perm3', priceInfo, mismatches: [], mixedLengths, tokenCount: tokens.length, lineStartIndices: [0] };
     }
 
     let result = [...tokens];
@@ -604,7 +607,7 @@ function parseLine(rawLine){
         }
       });
     }
-    return { source: mainPart, suffix: suffixRaw, type:'3 ตัวกลับ', result, groupType:'perm3', priceInfo, mismatches, mixedLengths, tokenCount: tokens.length };
+    return { source: mainPart, suffix: suffixRaw, type:'3 ตัวกลับ', result, groupType:'perm3', priceInfo, mismatches, mixedLengths, tokenCount: tokens.length, lineStartIndices: [0] };
   }
 
   if(len === 2){
@@ -630,7 +633,7 @@ function parseLine(rawLine){
         if(r !== t) result.push(r);
       });
     }
-    return { source: mainPart, suffix: suffixRaw, type:'2 ตัวกลับ', result, groupType:'perm2', priceInfo, mixedLengths };
+    return { source: mainPart, suffix: suffixRaw, type:'2 ตัวกลับ', result, groupType:'perm2', priceInfo, mixedLengths, lineStartIndices: [0] };
   }
 
   return { source: mainPart, suffix: suffixRaw, type:'ตามที่วาง', result: tokens, groupType:'raw', priceInfo };
@@ -684,14 +687,104 @@ function isPairPriceLine(line){
   return m ? { number: m[1], suffix: m[2].replace(/\s+/g, '') } : null;
 }
 
+// Merges lines that carry several numbers plus the exact same "N×M" price, wherever
+// they sit in the bill, into one group. Numbers stay in the order written; each
+// source line's first number is recorded so it can be shown in red for checking.
+// Lines with no price of their own that wrap into the next priced line are first
+// joined here too, so a bill split over two physical lines counts as one line.
+function mergeSamePriceLines(lines){
+  const groups = new Map();
+  const order = [];
+  let pending = [];   // {idx, tokens} of price-less lines waiting for the next priced line
+
+  for(let idx = 0; idx < lines.length; idx++){
+    const raw = (lines[idx] || '').trim();
+    if(!raw){ pending = []; continue; }
+    if(!/\d/.test(raw)) continue; // customer name / label: skip without breaking the run
+    if(isHeaderLabel(raw) || /^(เบิ้ล|ตอง)/i.test(raw) || /^ร(?:[ูุ]ด)?\s+/i.test(raw) || looksLikeWheelBlockStart(lines, idx)){
+      pending = []; continue;
+    }
+    if(isPlainPriceLine(raw) || isPairPriceLine(raw)){ pending = []; continue; }
+
+    const { mainPart, suffixRaw, forcedKind } = splitMainAndSuffix(raw);
+    if(forcedKind){ pending = []; continue; }
+    // a line that is only a price ("=20×3") closes the price-less lines above it
+    if(!mainPart){
+      const sm = suffixRaw.replace(/[×xX\/]/g, '*').replace(/\s+/g, '').match(/^(\d+)\*(\d+)/);
+      if(sm && pending.length){
+        const plen = pending[0].tokens[0].length;
+        const pkey = plen + ':' + sm[1] + '*' + sm[2];
+        if(!groups.has(pkey)){ groups.set(pkey, { suffixRaw, segments: [] }); order.push(pkey); }
+        pending.forEach(p => groups.get(pkey).segments.push(p));
+      }
+      pending = [];
+      continue;
+    }
+    const tokens = mainPart.split(/\D+/).map(s => s.trim()).filter(Boolean);
+    if(tokens.length === 0){ pending = []; continue; }
+    const len = tokens[0].length;
+    if(!(len === 2 || len === 3) || tokens.some(t => t.length !== len)){ pending = []; continue; }
+
+    if(!suffixRaw){
+      pending.push({ idx, tokens });
+      continue;
+    }
+    const norm = suffixRaw.replace(/[×xX\/]/g, '*').replace(/\s+/g, '');
+    const m = norm.match(/^(\d+)\*(\d+)/);
+    if(!m){ pending = []; continue; }
+    // lone 3-digit ตรง+โต๊ด lines keep their own dedicated handling
+    if(len === 3 && tokens.length === 1 && pending.length === 0 && m[2] !== '3' && m[2] !== '6'){ continue; }
+
+    const key = len + ':' + m[1] + '*' + m[2];
+    if(!groups.has(key)){ groups.set(key, { suffixRaw, segments: [] }); order.push(key); }
+    const g = groups.get(key);
+    pending.forEach(p => g.segments.push(p));
+    g.segments.push({ idx, tokens });
+    pending = [];
+  }
+
+  // only groups that actually combine 2+ source lines are worth merging
+  const result = [];
+  order.forEach(key => {
+    const g = groups.get(key);
+    if(g.segments.length >= 2) result.push(g);
+  });
+  return result;
+}
+
 function parseInput(rawText){
-  const lines = rawText.split('\n');
+  const lines = rawText.split('\n').map(l => l.trim().replace(/^[`'"]+/, '').replace(/[`'"]+$/, ''));
   const cards = [];
   let i = 0;
+
+  // pre-pass: combine same-price lines into one card each
+  const mergedCardAt = new Map();
+  mergeSamePriceLines(lines).forEach(g => {
+    const allTokens = [];
+    const lineStartIndices = [];
+    g.segments.forEach(seg => {
+      lineStartIndices.push(allTokens.length);
+      allTokens.push(...seg.tokens);
+    });
+    const parsed = parseLine(allTokens.join(' ') + '=' + g.suffixRaw);
+    if(!parsed) return;
+    parsed.lineStartIndices = lineStartIndices;
+    mergedCardAt.set(g.segments[0].idx, parsed);
+    g.segments.forEach((seg, n) => {
+      if(n > 0) lines[seg.idx] = '';          // later lines are absorbed
+    });
+    lines[g.segments[0].idx] = '\u0000MERGED\u0000';
+  });
 
   while(i < lines.length){
     const line = lines[i].trim();
     if(!line){ i++; continue; }
+
+    if(line === '\u0000MERGED\u0000'){
+      cards.push(mergedCardAt.get(i));
+      i++;
+      continue;
+    }
 
     if(isHeaderLabel(line) && looksLikeWheelBlockStart(lines, i+1)){
       i++; // absorb the "บ.ล.ก" style header, continue to the pool line
@@ -719,7 +812,7 @@ function parseInput(rawText){
           j++;
           continue;
         }
-        if(/^\d+\s*=\s*\d+\s*[×xX*\/]\s*\d+/.test(raw)){
+        if(/^\d{3}\s*=\s*\d+\s*[×xX*\/]\s*\d+/.test(raw)){
           const parsed = parseLine(raw);
           if(parsed) inlineCards.push(parsed);
           j++;
@@ -747,7 +840,9 @@ function parseInput(rawText){
     }
 
     // several 2-digit lines sharing an "N×M" price (often repeated again under a ล่าง label):
-    // group them by price, reverse each number implicitly, and drop duplicates
+    // group them by price. Each number already has its own declared price, so just
+    // group the literal numbers — no reverse is synthesized, which would otherwise
+    // bleed a number into a price group it was never written under.
     if(isPairPriceLine(line)){
       const groups = new Map();
       const order = [];
@@ -767,12 +862,7 @@ function parseInput(rawText){
       }
       if(hits >= 2){
         order.forEach(suffix => {
-          const result = [];
-          groups.get(suffix).forEach(n => {
-            if(!result.includes(n)) result.push(n);
-            const r = reverseToken(n);
-            if(r !== n && !result.includes(r)) result.push(r);
-          });
+          const result = [...groups.get(suffix)];
           cards.push({
             source: groups.get(suffix).join(' '),
             suffix,
@@ -866,6 +956,7 @@ function parseInput(rawText){
       const next = nextRaw.trim();
       if(!next || (!/\d/.test(next) && !/^(เบิ้ล|ตอง)/.test(next))) break; // blank/label line ends the group
       if((isHeaderLabel(next) && looksLikeWheelBlockStart(lines, j+1)) || looksLikeWheelBlockStart(lines, j) || /^ร[ูุ]ด\s+/i.test(next)) break;
+      if(isPlainPriceLine(next) || isPairPriceLine(next)) break; // let the dedicated price-grouping logic handle it instead
       buffer.push(next);
       j++;
       if(lineHasSuffix(next)) break; // group complete, price found
@@ -953,9 +1044,10 @@ function render(rawText){
     body.className = 'stub-body';
     const grid = document.createElement('div');
     grid.className = 'chip-grid';
-    item.result.forEach(n => {
+    const starts = new Set(item.lineStartIndices || []);
+    item.result.forEach((n, idx) => {
       const chip = document.createElement('span');
-      chip.className = 'chip';
+      chip.className = 'chip' + (starts.has(idx) ? ' chip-linestart' : '');
       chip.textContent = n;
       grid.appendChild(chip);
     });
@@ -1089,6 +1181,30 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   document.getElementById('input').value = '';
   document.getElementById('results').innerHTML = '<div class="empty-hint">ผลลัพธ์จะแสดงตรงนี้หลังกดแยกเลข</div>';
   window.__lastParsed = null;
+});
+
+document.getElementById('appendBtn').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  const input = document.getElementById('input');
+  let text = '';
+  try{
+    text = await navigator.clipboard.readText();
+  }catch(err){
+    const original = btn.textContent;
+    btn.textContent = 'อนุญาตการเข้าถึงคลิปบอร์ดก่อน';
+    setTimeout(() => { btn.textContent = original; }, 1800);
+    return;
+  }
+  text = text.trim();
+  if(!text) return;
+  input.value = input.value.trim() ? input.value.replace(/\s+$/, '') + '\n' + text : text;
+  input.scrollTop = input.scrollHeight;
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+  const original = btn.textContent;
+  btn.textContent = 'วางแล้ว ✓';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 900);
 });
 
 document.getElementById('copyAllBtn').addEventListener('click', (e) => {
