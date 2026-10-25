@@ -692,6 +692,13 @@ function isPairPriceLine(line){
 // source line's first number is recorded so it can be shown in red for checking.
 // Lines with no price of their own that wrap into the next priced line are first
 // joined here too, so a bill split over two physical lines counts as one line.
+// 3-digit lines priced "N×3" or "N×6" are the same kind of bet (3 กลับ / 6 กลับ) —
+// group them by price N alone. Everything else keeps the full "N×M" as its key.
+function mergeKey(len, n, m){ // groups by price, ×3 and ×6 together
+  if(len === 3 && (m === '3' || m === '6')) return len + ':' + n + '*(3|6)';
+  return len + ':' + n + '*' + m;
+}
+
 function mergeSamePriceLines(lines){
   const groups = new Map();
   const order = [];
@@ -713,9 +720,9 @@ function mergeSamePriceLines(lines){
       const sm = suffixRaw.replace(/[×xX\/]/g, '*').replace(/\s+/g, '').match(/^(\d+)\*(\d+)/);
       if(sm && pending.length){
         const plen = pending[0].tokens[0].length;
-        const pkey = plen + ':' + sm[1] + '*' + sm[2];
+        const pkey = mergeKey(plen, sm[1], sm[2]);
         if(!groups.has(pkey)){ groups.set(pkey, { suffixRaw, segments: [] }); order.push(pkey); }
-        pending.forEach(p => groups.get(pkey).segments.push(p));
+        pending.forEach(p => groups.get(pkey).segments.push({ ...p, m: sm[2], suffixRaw }));
       }
       pending = [];
       continue;
@@ -735,11 +742,11 @@ function mergeSamePriceLines(lines){
     // lone 3-digit ตรง+โต๊ด lines keep their own dedicated handling
     if(len === 3 && tokens.length === 1 && pending.length === 0 && m[2] !== '3' && m[2] !== '6'){ continue; }
 
-    const key = len + ':' + m[1] + '*' + m[2];
+    const key = mergeKey(len, m[1], m[2]);
     if(!groups.has(key)){ groups.set(key, { suffixRaw, segments: [] }); order.push(key); }
     const g = groups.get(key);
-    pending.forEach(p => g.segments.push(p));
-    g.segments.push({ idx, tokens });
+    pending.forEach(p => g.segments.push({ ...p, m: m[2], suffixRaw }));
+    g.segments.push({ idx, tokens, m: m[2], suffixRaw });
     pending = [];
   }
 
@@ -769,6 +776,21 @@ function parseInput(rawText){
     const parsed = parseLine(allTokens.join(' ') + '=' + g.suffixRaw);
     if(!parsed) return;
     parsed.lineStartIndices = lineStartIndices;
+    // lines in one group may use different counts (e.g. 30×3 and 30×6): check each
+    // number against the count written on its own line, and show every suffix used
+    const distinct = [...new Set(g.segments.map(sg => sg.suffixRaw.replace(/\s+/g, '')))];
+    if(distinct.length > 1) parsed.suffix = distinct.join(' + ');
+    if(parsed.groupType === 'perm3'){
+      parsed.mismatches = [];
+      g.segments.forEach(sg => {
+        sg.tokens.forEach(t => {
+          const actual = permute3Others(t).length + 1;
+          if((sg.m === '3' || sg.m === '6') && actual !== parseInt(sg.m, 10)){
+            parsed.mismatches.push({ token: t, actual, expected: parseInt(sg.m, 10) });
+          }
+        });
+      });
+    }
     mergedCardAt.set(g.segments[0].idx, parsed);
     g.segments.forEach((seg, n) => {
       if(n > 0) lines[seg.idx] = '';          // later lines are absorbed
